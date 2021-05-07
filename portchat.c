@@ -127,7 +127,6 @@ void conPort(int port) {
     return;
   }
   // receive data from the port
-  int status;
   recv(n_socket, &server_response, sizeof(server_response), 0);
 
 
