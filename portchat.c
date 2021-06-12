@@ -4,20 +4,22 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 
 #include <netinet/in.h>
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
+#define ANSI_COLOR_GREEN   "\e[0;32m"
 
 void menu();
-void listenPort();
+void createServer();
 void flushBuffer();
 int getPort();
 
 
 int main() {
-  printf("Welcome to portchatter.\n\nPlease pick an option:\n");
+  printf("Welcome to portchat.\n\nPlease pick an option:\n");
   menu();
   return 0;
 }
@@ -28,19 +30,21 @@ void menu() {
 
   while (1) {
     printf("%s", 
-    "1: Listen on a port\n"
-    "2: Connect to a port\n"
+    "1: Create a server\n"
+    "2: Connect to a server\n"
     "3: Exit\n");
 
     scanf("%d", &choice); // vulnerable to buffer overflow 
-    while (getchar() != '\n') { } 
+
+    while (getchar() != '\n') { } // clear the buffer
+
     if (choice == 1) {
       port = getPort();
-      listenPort(port);
+      createServer(port);
     }
     else if (choice == 2) {
       port = getPort();
-      conPort(port);
+      conServer(port);
     }
     else if (choice == 3) {
       printf("Bye.\n");
@@ -58,8 +62,8 @@ int getPort() {
   int flag = 1;
 
   while (1) {
-    printf("Please enter a port number:\n");
-    fflush(stdin);
+    printf("\nPlease enter the address of the server:\n"); // for now only the port number
+    fflush(stdin);                // clear the buffer
     fgets(portString, 20, stdin);
 
     if (strcmp(portString, "q") == 0) {
@@ -80,17 +84,18 @@ int getPort() {
       printf(ANSI_COLOR_RED "\nNumber must be in range 0-63335.\n" ANSI_COLOR_RESET "\n");
     }
     else {
-      printf(ANSI_COLOR_RED "\nIncorrect input.\n" ANSI_COLOR_RESET "\n");
+      printf(ANSI_COLOR_RED "\nIncorrect input." ANSI_COLOR_RESET "\n");
       flag = 1;
     }
   }
 }
 
-void listenPort(int port) {
-  char server_message[256] = "You have reached the server!";
-  // create the server socket 
+void createServer(int port) {
+  char server_message[] = "You have connected to the server!\n\n";
+  // create the server socket
   int server_socket;
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
+
   // define the server address
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
@@ -98,36 +103,40 @@ void listenPort(int port) {
   server_address.sin_addr.s_addr = INADDR_ANY;
   // bind the socket to our specified IP and port
   bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
-  
-  listen(server_socket, 1);
 
-  int client_socket;
 
-  client_socket = accept(server_socket, NULL, NULL);
-  while (client_socket != -1) {
-    send(client_socket, server_message, sizeof(server_message), 0);
+
   }
-}
 
-void conPort(int port) {
-  int n_socket;
-  char server_response[256];
+void conServer(int port) {
+  // create a socket
+  int network_socket;
+  network_socket = socket(AF_INET, SOCK_STREAM, 0);
 
-  n_socket = socket(AF_INET, SOCK_STREAM, 0);
-
+  // specify an address for the socket
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
   server_address.sin_port = htons(port);
   server_address.sin_addr.s_addr = INADDR_ANY;
 
-  int connection_status = connect(n_socket, (struct sockaddr *) &server_address, sizeof(server_address));
-
+  int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
+  // checkk for error with the connection
   if (connection_status == -1) {
-    printf(ANSI_COLOR_RED "\nCouldn't connect to the port.\n" ANSI_COLOR_RESET "\n");
+    printf(ANSI_COLOR_RED "\nCouldn't connect to the server.\n" ANSI_COLOR_RESET "\n");
     return;
   }
-  // receive data from the port
-  recv(n_socket, &server_response, sizeof(server_response), 0);
+  else {
+    printf(ANSI_COLOR_GREEN "\nConnection to the server established.\n\n" ANSI_COLOR_RESET "\n");
+  }
+  
+  while (1) {
+    char server_response[256];
+    int length = recv(network_socket, &server_response, sizeof(server_response), 0);
+    server_response[length] = '\0';
+    if (strcmp(server_response, "\n") != 0) {
+      printf("From server: %s", server_response);
+    }
+  }
 
 
 }
