@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <unistd.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-
 #include <netinet/in.h>
 
 #define ANSI_COLOR_RED     "\x1b[31m"
@@ -14,11 +14,14 @@
 
 void menu();
 void createServer();
-void flushBuffer();
 int getPort();
+void * sendInput(void * arg);
 
+char input[256];
+int sendFlag = 0;
 
 int main() {
+  
   printf("Welcome to portchat.\n\nPlease pick an option:\n");
   menu();
   return 0;
@@ -27,6 +30,8 @@ int main() {
 void menu() {
   int choice;
   int port;
+
+  pthread_t thread1;
 
   while (1) {
     printf("%s", 
@@ -53,6 +58,7 @@ void menu() {
     else {
       printf(ANSI_COLOR_RED "\nPlease pick one of the options.\n" ANSI_COLOR_RESET "\n");
     }
+    fflush(stdin);
   }
 }
 
@@ -87,11 +93,12 @@ int getPort() {
       printf(ANSI_COLOR_RED "\nIncorrect input." ANSI_COLOR_RESET "\n");
       flag = 1;
     }
+    fflush(stdin);
   }
 }
 
 void createServer(int port) {
-  char server_message[] = "You have connected to the server!\n\n";
+  char server_message[] = "You have connected to the server!\n";
   // create the server socket
   int server_socket;
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -102,15 +109,50 @@ void createServer(int port) {
   server_address.sin_port = htons(port);
   server_address.sin_addr.s_addr = INADDR_ANY;
   // bind the socket to our specified IP and port
-  bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
+  int server_status = bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address));
 
-
-
+  if (server_status == 0) {
+    printf(ANSI_COLOR_GREEN "\nServer has been successfully created!\n" ANSI_COLOR_RESET "\n");
   }
+  else {
+    printf(ANSI_COLOR_RED "\nUnable to create the server.\n" ANSI_COLOR_RESET "\n");
+  }
+
+  listen(server_socket, 1);
+
+  int client_socket;
+  client_socket = accept(server_socket, NULL, NULL);
+
+  if (client_socket > -1) {
+    printf(ANSI_COLOR_GREEN "\nSomeone has connected to the server!\n" ANSI_COLOR_RESET "\n");
+    send(client_socket, server_message, sizeof(server_message), 0);
+  }
+
+  while (client_socket > -1) {
+    char response[256];
+    int length = recv(client_socket, &response, sizeof(response), 0);
+    if (length = 0) {
+      printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
+      break;
+    }
+    response[length] = '\0';
+    if (strcmp(response, "\n") != 0) {
+      printf("");
+    }
+  
+  
+  // close the socket
+  close(server_socket);
+  }
+}
 
 void conServer(int port) {
   // create a socket
   int network_socket;
+
+  pthread_t thread1;
+  pthread_create(&thread1, NULL, sendInput, NULL);
+
   network_socket = socket(AF_INET, SOCK_STREAM, 0);
 
   // specify an address for the socket
@@ -120,24 +162,43 @@ void conServer(int port) {
   server_address.sin_addr.s_addr = INADDR_ANY;
 
   int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
-  // checkk for error with the connection
+  // check for error with the connection
   if (connection_status == -1) {
     printf(ANSI_COLOR_RED "\nCouldn't connect to the server.\n" ANSI_COLOR_RESET "\n");
     return;
   }
   else {
-    printf(ANSI_COLOR_GREEN "\nConnection to the server established.\n\n" ANSI_COLOR_RESET "\n");
-  }
-  
-  while (1) {
-    char server_response[256];
-    int length = recv(network_socket, &server_response, sizeof(server_response), 0);
-    server_response[length] = '\0';
-    if (strcmp(server_response, "\n") != 0) {
-      printf("From server: %s", server_response);
+    printf(ANSI_COLOR_GREEN "\nConnection to the server established.\n" ANSI_COLOR_RESET "\n");
+ }
+
+  while (connection_status == 0) {
+    char server_response[256] = "\n";
+    int length = recv(network_socket, &server_response, sizeof(server_response), MSG_DONTWAIT);
+    if (length == 0) {
+      printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
+      break;
     }
+    if (sendFlag == 1) {
+      send(network_socket, input, sizeof(input), 0);
+      sendFlag = 0;
+    }
+    server_response[length] = '\0';
+
+    if (strcmp(server_response, "\n") != 0) {
+      printf("%*c%s", 30, ' ', server_response);
   }
-
-
+    pthread_create(&thread1, NULL, sendInput, NULL);
+  }
+    printf("Connection closed.\n");
 }
+
+void* sendInput(void * arg) {
+  fgets(input, sizeof(input), stdin);
+  sendFlag = 1;
+  return NULL;
+}
+
+    
+
+
 
