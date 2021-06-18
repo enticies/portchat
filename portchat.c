@@ -99,6 +99,10 @@ int getPort() {
 
 void createServer(int port) {
   char server_message[] = "You have connected to the server!\n";
+
+  pthread_t thread1;
+  pthread_create(&thread1, NULL, sendInput, NULL);
+
   // create the server socket
   int server_socket;
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -125,25 +129,31 @@ void createServer(int port) {
 
   if (client_socket > -1) {
     printf(ANSI_COLOR_GREEN "\nSomeone has connected to the server!\n" ANSI_COLOR_RESET "\n");
-    send(client_socket, server_message, sizeof(server_message), 0);
+    send(client_socket, server_message, sizeof(server_message), MSG_DONTWAIT);
+
   }
 
   while (client_socket > -1) {
-    char response[256];
-    int length = recv(client_socket, &response, sizeof(response), 0);
-    if (length = 0) {
+    char client_response[256] = "\n";
+    int length = recv(client_socket, &client_response, sizeof(client_response), MSG_DONTWAIT);
+
+    if (length == 0) {
       printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
       break;
     }
-    response[length] = '\0';
-    if (strcmp(response, "\n") != 0) {
-      printf("");
+    if (sendFlag == 1) {
+      send(client_socket, input, sizeof(input), 0);
+      sendFlag = 0;
     }
-  
-  
+    client_response[length] = '\0';
+    if (strcmp(client_response, "\n") != 0) {
+      printf("%*c%s", 50, ' ', client_response);
+    }
+    pthread_create(&thread1, NULL, sendInput, NULL);
+  }
+
   // close the socket
   close(server_socket);
-  }
 }
 
 void conServer(int port) {
@@ -176,20 +186,18 @@ void conServer(int port) {
     int length = recv(network_socket, &server_response, sizeof(server_response), MSG_DONTWAIT);
     if (length == 0) {
       printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
-      break;
+      return;
     }
     if (sendFlag == 1) {
       send(network_socket, input, sizeof(input), 0);
       sendFlag = 0;
     }
     server_response[length] = '\0';
-
     if (strcmp(server_response, "\n") != 0) {
-      printf("%*c%s", 30, ' ', server_response);
+      printf("%*c%s", 50, ' ', server_response);
   }
     pthread_create(&thread1, NULL, sendInput, NULL);
   }
-    printf("Connection closed.\n");
 }
 
 void* sendInput(void * arg) {
