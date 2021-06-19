@@ -14,91 +14,80 @@
 
 void menu();
 void createServer();
-int getPort();
 void * sendInput(void * arg);
+void printError(char *);
+void usage();
+int checkPort(char *);
 
-char input[256];
+char input[99999];
 int sendFlag = 0;
 
-int main() {
-  
-  printf("Welcome to portchat.\n\nPlease pick an option:\n");
-  menu();
-  return 0;
-}
+int main(int argc, char **argv) {
+  if (argc == 1) {
+    printError("usage");
+  }
 
-void menu() {
-  int choice;
-  int port;
-
-  pthread_t thread1;
-
-  while (1) {
-    printf("%s", 
-    "1: Create a server\n"
-    "2: Connect to a server\n"
-    "3: Exit\n");
-
-    scanf("%d", &choice); // vulnerable to buffer overflow 
-
-    while (getchar() != '\n') { } // clear the buffer
-
-    if (choice == 1) {
-      port = getPort();
-      createServer(port);
-    }
-    else if (choice == 2) {
-      port = getPort();
-      conServer(port);
-    }
-    else if (choice == 3) {
-      printf("Bye.\n");
+  else if (argc > 1) {
+    if (*argv[1] != '-') {
+      printError("usage");
       exit(0);
     }
-    else {
-      printf(ANSI_COLOR_RED "\nPlease pick one of the options.\n" ANSI_COLOR_RESET "\n");
+
+    if (strcmp(argv[1], "-h") == 0) {
+      usage();
     }
-    fflush(stdin);
-  }
+    else if (strcmp(argv[1], "-c") == 0) {
+      conServer();
+    }
+    else if (strcmp(argv[1], "-s") == 0) {
+      if (argc == 2) {
+        usage();
+        exit(0);
+      }
+      int port = checkPort(argv[2]);
+      createServer(port);
+    }
+  return 0;
+}
 }
 
-int getPort() {
-  int port;
-  char portString[20];
+int checkPort(char * port) {
   int flag = 1;
 
-  while (1) {
-    printf("\nPlease enter the address of the server:\n"); // for now only the port number
-    fflush(stdin);                // clear the buffer
-    fgets(portString, 20, stdin);
-
-    if (strcmp(portString, "q") == 0) {
-      break;
+  for (int i=0; i<strlen(port)-1; i++) {
+    if (!isdigit(port[i])) {
+      flag = 0;
     }
-
-    for (int i=0; i<strlen(portString)-1; i++) {
-      if (!isdigit(portString[i])) {
-        flag = 0;
-      }
-    }
-    
-    if (flag) {
-      port = atoi(portString);
-      if (port >= 0 && port <= 65535) {
-        return port;
-      }
-      printf(ANSI_COLOR_RED "\nNumber must be in range 0-63335.\n" ANSI_COLOR_RESET "\n");
-    }
-    else {
-      printf(ANSI_COLOR_RED "\nIncorrect input." ANSI_COLOR_RESET "\n");
-      flag = 1;
-    }
-    fflush(stdin);
   }
+  if (flag) {
+    port = atoi(port);
+    if (port >= 0 && port <= 65535) {
+      return port;
+    }
+    printError("range error");
+  }
+  else {
+    printError("incorrect port");
+  }
+  exit(1);
 }
+
+void usage() {
+  printf("create a server: portchat -s [port]\n"
+         "connect to somewhere: portchat -c IP port\n"
+         "options:\n"
+                  "-c        connect to some server by supplying the IP and the port\n"
+                  "-s        create a server on the local machine\n"
+                  "-h        print this help message\n");
+         }
+           
 
 void createServer(int port) {
   char server_message[] = "You have connected to the server!\n";
+
+  pthread_t thread1;
+  pthread_create(&thread1, NULL, sendInput, NULL);
+
   // create the server socket
   int server_socket;
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -115,7 +104,7 @@ void createServer(int port) {
     printf(ANSI_COLOR_GREEN "\nServer has been successfully created!\n" ANSI_COLOR_RESET "\n");
   }
   else {
-    printf(ANSI_COLOR_RED "\nUnable to create the server.\n" ANSI_COLOR_RESET "\n");
+    printError("server creation");
   }
 
   listen(server_socket, 1);
@@ -125,25 +114,31 @@ void createServer(int port) {
 
   if (client_socket > -1) {
     printf(ANSI_COLOR_GREEN "\nSomeone has connected to the server!\n" ANSI_COLOR_RESET "\n");
-    send(client_socket, server_message, sizeof(server_message), 0);
+    send(client_socket, server_message, sizeof(server_message), MSG_DONTWAIT);
+
   }
 
   while (client_socket > -1) {
-    char response[256];
-    int length = recv(client_socket, &response, sizeof(response), 0);
-    if (length = 0) {
-      printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
+    char client_response[99999] = "\n";
+    int length = recv(client_socket, &client_response, sizeof(client_response), MSG_DONTWAIT);
+
+    if (length == 0) {
+      printError("closed connection");
       break;
     }
-    response[length] = '\0';
-    if (strcmp(response, "\n") != 0) {
-      printf("");
+    if (sendFlag == 1) {
+      send(client_socket, input, sizeof(input), 0);
+      sendFlag = 0;
     }
-  
-  
+    /* client_response[length] = '\0'; */
+    if (strcmp(client_response, "\n") != 0) {
+      printf("%*c%s", 50, ' ', client_response);
+    }
+    pthread_create(&thread1, NULL, sendInput, NULL);
+  }
+
   // close the socket
   close(server_socket);
-  }
 }
 
 void conServer(int port) {
@@ -164,6 +159,7 @@ void conServer(int port) {
   int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
   // check for error with the connection
   if (connection_status == -1) {
+    printError("not connected");
     printf(ANSI_COLOR_RED "\nCouldn't connect to the server.\n" ANSI_COLOR_RESET "\n");
     return;
   }
@@ -172,33 +168,63 @@ void conServer(int port) {
  }
 
   while (connection_status == 0) {
-    char server_response[256] = "\n";
+    char server_response[99999] = "\n";
     int length = recv(network_socket, &server_response, sizeof(server_response), MSG_DONTWAIT);
+
     if (length == 0) {
-      printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
-      break;
+      printError("closed connection");
+      return;
     }
     if (sendFlag == 1) {
       send(network_socket, input, sizeof(input), 0);
       sendFlag = 0;
     }
-    server_response[length] = '\0';
-
+    /* server_response[length] = '\0'; */
     if (strcmp(server_response, "\n") != 0) {
-      printf("%*c%s", 30, ' ', server_response);
+      printf("%*c%s", 50, ' ', server_response);
   }
     pthread_create(&thread1, NULL, sendInput, NULL);
   }
-    printf("Connection closed.\n");
 }
 
 void* sendInput(void * arg) {
-  fgets(input, sizeof(input), stdin);
-  sendFlag = 1;
+  if (strlen(fgets(input, sizeof(input), stdin)) < 100000) {
+    sendFlag = 1;
+  }
+  else {
+    printError("large input");
+  }
   return NULL;
 }
 
-    
-
-
-
+void printError(char * errorType) {
+  // input related
+  if (strcmp(errorType, "large input") == 0) {
+    printf(ANSI_COLOR_RED "Input too large.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "usage") == 0) {
+    printf("Incorrect usage. Use the -h flag to see the correct usage.\n");
+  }
+  else if (strcmp(errorType, "incorrect input") == 0) {
+    printf(ANSI_COLOR_RED "\nIncorrect input.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "incorrect port") == 0) {
+    printf(ANSI_COLOR_RED "\nIncorrect port number.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "wrong option") == 0) {
+    printf(ANSI_COLOR_RED "\nPlease pick one of the options.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "range error") == 0) {
+    printf(ANSI_COLOR_RED "\nNumber must be in range 0-63335.\n" ANSI_COLOR_RESET "\n");
+  }
+  // connection related
+  else if (strcmp(errorType, "closed connection") == 0) {
+    printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "server creation") == 0) {
+    printf(ANSI_COLOR_RED "\nUnable to create the server.\n" ANSI_COLOR_RESET "\n");
+  }
+  else if (strcmp(errorType, "not connected") == 0) {
+    printf(ANSI_COLOR_RED "\nCouldn't connect to the server.\n" ANSI_COLOR_RESET "\n");
+  }
+}
