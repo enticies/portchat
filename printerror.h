@@ -21,9 +21,6 @@ void printError(char * errorType) {
   else if (strcmp(errorType, "incorrect port") == 0) {
     printf(ANSI_COLOR_RED "\nIncorrect port number.\n" ANSI_COLOR_RESET "\n");
   }
-  else if (strcmp(errorType, "wrong option") == 0) {
-    printf(ANSI_COLOR_RED "\nPlease pick one of the options.\n" ANSI_COLOR_RESET "\n");
-  }
   else if (strcmp(errorType, "range error") == 0) {
     printf(ANSI_COLOR_RED "\nNumber must be in range 0-63335.\n" ANSI_COLOR_RESET "\n");
   }
