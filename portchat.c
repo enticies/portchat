@@ -14,8 +14,8 @@
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 void menu();
-void createServer(int, int);
-void conServer(char *ip, int, int);
+void createServer(int);
+void conServer(char *ip, int);
 void * getInput(void * arg);
 void usage();
 void coloring();
@@ -27,9 +27,6 @@ int sendFlag = 0;
 int input_length;
 
 int main(int argc, char **argv) {
-  struct winsize w;
-  ioctl(0, TIOCGWINSZ, &w);
-  
   if (argc < 2) {
     printError("usage");
   }
@@ -40,11 +37,11 @@ int main(int argc, char **argv) {
     }
     else if ((strcmp(argv[1], "-c")) == 0 && argc == 4) {
       int port = checkPort(argv[3]);
-      conServer(argv[2], port, w.ws_col);
+      conServer(argv[2], port);
     }
     else if ((strcmp(argv[1], "-s")) == 0 && argc == 3) {
       int port = checkPort(argv[2]);
-      createServer(port, w.ws_col);
+      createServer(port);
     }
     else {
       usage();
@@ -86,10 +83,11 @@ int checkPort(char * port) {
   exit(1);
 }
 
-void createServer(int port, int columns) {
+void createServer(int port) {
+  struct winsize w;
+  int columns = w.ws_col;
   char server_message[] = "You have connected to the server!\n\n";
   pthread_t thread1;
-  pthread_create(&thread1, NULL, getInput, NULL);
 
   // create the server socket
   long server_socket;
@@ -118,12 +116,14 @@ void createServer(int port, int columns) {
   client_socket = accept(server_socket, NULL, NULL);
 
   if (client_socket > -1) {
-    printf("Someone has connected to the server!\n\n");
     pthread_create(&thread1, NULL, getInput, NULL); // don't need to create every loop
+    printf("\n\nSomeone has connected to the server!\n\n");
     send(client_socket, server_message, sizeof(server_message), MSG_DONTWAIT);
   }
 
   while (client_socket > -1) {
+    ioctl(0, TIOCGWINSZ, &w);
+    columns = w.ws_col;
     char client_response[99999] = "\n";
 
     int length = recv(client_socket, &client_response, sizeof(client_response), MSG_DONTWAIT);
@@ -151,12 +151,13 @@ void createServer(int port, int columns) {
   printError("closed connection");
 }
 
-void conServer(char * ip, int port, int columns) {
+void conServer(char * ip, int port) {
+  struct winsize w;
+  int columns = w.ws_col;
   // create a socket
   long network_socket;
 
   pthread_t thread1;
-  pthread_create(&thread1, NULL, getInput, NULL);
 
   network_socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -183,6 +184,8 @@ void conServer(char * ip, int port, int columns) {
 
   pthread_create(&thread1, NULL, getInput, NULL);
   while (connection_status == 0) {
+    ioctl(0, TIOCGWINSZ, &w);
+    columns = w.ws_col;
     char server_response[99999] = "\n";
     int length = recv(network_socket, &server_response, sizeof(server_response), MSG_DONTWAIT);
 
@@ -205,6 +208,10 @@ void conServer(char * ip, int port, int columns) {
 }
 
 void* getInput(void * arg) {
+  int ch;
+  /* printf("You: "); */
+  /* fflush(stdout); */
+  /* while ((ch = getchar()) != '\n'); */
   if (strlen(fgets(input, sizeof(input), stdin)) < 100000) {
     input[strlen(input)-1] = '\0';
     sendFlag = 1;
@@ -214,6 +221,7 @@ void* getInput(void * arg) {
   }
   return NULL;
 }
+
 void printError(char * errorType) {
   // input related
   if (strcmp(errorType, "large input") == 0) {
