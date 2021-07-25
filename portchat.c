@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
+#include <ctype.h>
 
 #define ANSI_COLOR_GREEN   "\e[0;32m"
 #define ANSI_COLOR_RED     "\x1b[31m"
@@ -20,6 +21,7 @@ void * getInput(void * arg);
 void usage();
 void coloring();
 int checkPort(char *);
+void printError(char *);
 
 char input[99999];
 int sendFlag = 0;
@@ -84,11 +86,9 @@ int checkPort(char * port) {
 }
 
 void createServer(int port) {
+  pthread_t thread1;
   struct winsize w;
   int columns = w.ws_col;
-  char server_message[] = "You have connected to the server!\n\n";
-  pthread_t thread1;
-
   // create the server socket
   long server_socket;
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -116,9 +116,10 @@ void createServer(int port) {
   client_socket = accept(server_socket, NULL, NULL);
 
   if (client_socket > -1) {
-    pthread_create(&thread1, NULL, getInput, NULL); // don't need to create every loop
     printf("\n\nSomeone has connected to the server!\n\n");
-    send(client_socket, server_message, sizeof(server_message), MSG_DONTWAIT);
+    int ch;
+    while ((ch = getchar()) != '\n') { }   // flush the input buffer
+    pthread_create(&thread1, NULL, getInput, NULL); // don't need to create every loop
   }
 
   while (client_socket > -1) {
@@ -180,9 +181,9 @@ void conServer(char * ip, int port) {
   }
   else {
     printf("Connection to the server established.\n");
+    pthread_create(&thread1, NULL, getInput, NULL);
  }
 
-  pthread_create(&thread1, NULL, getInput, NULL);
   while (connection_status == 0) {
     ioctl(0, TIOCGWINSZ, &w);
     columns = w.ws_col;
@@ -194,7 +195,7 @@ void conServer(char * ip, int port) {
       return;
     }
 
-    if (sendFlag == 1 && strcmp(input, "\n") != 0) {
+    if (sendFlag == 1) {
       send(network_socket, input, strlen(input), 0);
       sendFlag = 0;
       pthread_create(&thread1, NULL, getInput, NULL);
@@ -209,9 +210,6 @@ void conServer(char * ip, int port) {
 
 void* getInput(void * arg) {
   int ch;
-  /* printf("You: "); */
-  /* fflush(stdout); */
-  /* while ((ch = getchar()) != '\n'); */
   if (strlen(fgets(input, sizeof(input), stdin)) < 100000) {
     input[strlen(input)-1] = '\0';
     sendFlag = 1;
