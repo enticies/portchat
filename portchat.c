@@ -15,12 +15,11 @@
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 void menu();
-void createServer(int);
-void conServer(char *ip, int);
-void * getInput(void * arg);
+void create_server(int);
+void con_server(char *ip, int);
+void * get_input(void * arg);
 void usage();
-void coloring();
-int checkPort(char *);
+int check_port(char *);
 void print_error(int);
 
 char input[99999];
@@ -38,12 +37,12 @@ int main(int argc, char **argv) {
       exit(0);
     }
     else if ((strcmp(argv[1], "-c")) == 0 && argc == 4) {
-      int port = checkPort(argv[3]);
-      conServer(argv[2], port);
+      int port = check_port(argv[3]);
+      con_server(argv[2], port);
     }
     else if ((strcmp(argv[1], "-s")) == 0 && argc == 3) {
-      int port = checkPort(argv[2]);
-      createServer(port);
+      int port = check_port(argv[2]);
+      create_server(port);
     }
     else {
       usage();
@@ -63,7 +62,7 @@ void usage() {
          }
            
 
-int checkPort(char * port) {
+int check_port(char * port) {
   int flag = 1;
   int int_port;
 
@@ -85,7 +84,7 @@ int checkPort(char * port) {
   exit(1);
 }
 
-void createServer(int port) {
+void create_server(int port) {
   pthread_t thread1;
   struct winsize w;
   int columns = w.ws_col;
@@ -119,7 +118,7 @@ void createServer(int port) {
     printf("\n\nSomeone has connected to the server!\n\n");
     int ch;
     while ((ch = getchar()) != '\n') { }   // flush the input buffer
-    pthread_create(&thread1, NULL, getInput, NULL); // don't need to create every loop
+    pthread_create(&thread1, NULL, get_input, NULL); // don't need to create every loop
   }
 
   while (client_socket > -1) {
@@ -138,7 +137,7 @@ void createServer(int port) {
     if (sendFlag == 1) {
       send(client_socket, input, strlen(input), 0);
       sendFlag = 0;
-      pthread_create(&thread1, NULL, getInput, NULL);
+      pthread_create(&thread1, NULL, get_input, NULL);
     }
     client_response[length] = '\0';
     if (length > 0 && strcmp(client_response, "\n") != 0) {
@@ -152,7 +151,7 @@ void createServer(int port) {
   print_error(5);
 }
 
-void conServer(char * ip, int port) {
+void con_server(char * ip, int port) {
   struct winsize w;
   int columns = w.ws_col;
   // create a socket
@@ -181,7 +180,7 @@ void conServer(char * ip, int port) {
   }
   else {
     printf("Connection to the server established.\n");
-    pthread_create(&thread1, NULL, getInput, NULL);
+    pthread_create(&thread1, NULL, get_input, NULL);
  }
 
   while (connection_status == 0) {
@@ -198,7 +197,7 @@ void conServer(char * ip, int port) {
     if (sendFlag == 1) {
       send(network_socket, input, strlen(input), 0);
       sendFlag = 0;
-      pthread_create(&thread1, NULL, getInput, NULL);
+      pthread_create(&thread1, NULL, get_input, NULL);
     }
     server_response[length] = '\0';
     if (length > 0 && strcmp(server_response, "\n") != 0) {
@@ -208,7 +207,7 @@ void conServer(char * ip, int port) {
   print_error(5);
 }
 
-void* getInput(void * arg) {
+void* get_input(void * arg) {
   int ch;
   if (strlen(fgets(input, sizeof(input), stdin)) < 100000) {
     input[strlen(input)-1] = '\0';
