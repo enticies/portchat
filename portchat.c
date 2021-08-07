@@ -21,7 +21,7 @@ void * getInput(void * arg);
 void usage();
 void coloring();
 int checkPort(char *);
-void printError(char *);
+void print_error(int);
 
 char input[99999];
 int sendFlag = 0;
@@ -30,7 +30,7 @@ int input_length;
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    printError("usage");
+    print_error(1);
   }
   else { 
     if (strcmp(argv[1], "-h") == 0) {
@@ -77,10 +77,10 @@ int checkPort(char * port) {
     if (int_port >= 0 && int_port <= 65535) {
       return int_port;
     }
-    printError("range error");
+    print_error(4);
   }
   else {
-    printError("incorrect port");
+    print_error(3);
   }
   exit(1);
 }
@@ -106,7 +106,7 @@ void createServer(int port) {
     printf("Server has been successfully created!\t\t\tPort: %d\n\n", port);
   }
   else {
-    printError("server creation");
+    print_error(6);
     exit(1);
   }
 
@@ -130,7 +130,7 @@ void createServer(int port) {
     int length = recv(client_socket, &client_response, sizeof(client_response), MSG_DONTWAIT);
 
     if (length == 0) {
-      printError("closed connection");
+      print_error(5);
       exit(0);
       break;
     }
@@ -149,7 +149,7 @@ void createServer(int port) {
   // close the socket
   close(server_socket);
   // end ncurses
-  printError("closed connection");
+  print_error(5);
 }
 
 void conServer(char * ip, int port) {
@@ -169,14 +169,14 @@ void conServer(char * ip, int port) {
   server_address.sin_addr.s_addr = INADDR_ANY;
 
   if (inet_pton(AF_INET, ip, &(server_address.sin_addr)) < 1) {
-    printError("ip");
+    print_error(8);
     exit(1);
   }
 
   int connection_status = connect(network_socket, (struct sockaddr *) &server_address, sizeof(server_address));
   // check for error with the connection
   if (connection_status == -1) {
-    printError("not connected");
+    print_error(7);
     return;
   }
   else {
@@ -191,7 +191,7 @@ void conServer(char * ip, int port) {
     int length = recv(network_socket, &server_response, sizeof(server_response), MSG_DONTWAIT);
 
     if (length == 0) {
-      printError("closed connection");
+      print_error(5);
       return;
     }
 
@@ -205,7 +205,7 @@ void conServer(char * ip, int port) {
       printf("%*sOther Side: %s\n", (int) ((float) columns * 0.5),  " ", server_response);
   }
   }
-  printError("closed connection");
+  print_error(5);
 }
 
 void* getInput(void * arg) {
@@ -215,39 +215,24 @@ void* getInput(void * arg) {
     sendFlag = 1;
   }
   else {
-    printError("large input");
+    print_error(0);
   }
   return NULL;
 }
 
-void printError(char * errorType) {
-  // input related
-  if (strcmp(errorType, "large input") == 0) {
-    printf(ANSI_COLOR_RED "Input too large.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "usage") == 0) {
-    printf("Incorrect usage. Use the -h flag to see the correct usage.\n");
-  }
-  else if (strcmp(errorType, "incorrect input") == 0) {
-    printf(ANSI_COLOR_RED "\nIncorrect input.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "incorrect port") == 0) {
-    printf(ANSI_COLOR_RED "\nIncorrect port number.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "range error") == 0) {
-    printf(ANSI_COLOR_RED "\nNumber must be in range 0-63335.\n" ANSI_COLOR_RESET "\n");
-  }
-  // connection related
-  else if (strcmp(errorType, "closed connection") == 0) {
-    printf(ANSI_COLOR_RED "\nConnection closed.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "server creation") == 0) {
-    printf(ANSI_COLOR_RED "\nUnable to create the server.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "not connected") == 0) {
-    printf(ANSI_COLOR_RED "\nCouldn't connect to the server.\n" ANSI_COLOR_RESET "\n");
-  }
-  else if (strcmp(errorType, "ip") == 0) {
-    printf(ANSI_COLOR_RED "\nInvalid IP address.\n" ANSI_COLOR_RESET "\n");
-  }
+void print_error(int error_code) {
+  char * errors[] = {
+    "Input too large.",
+    "Incorrect usage. Use the -h flag  to see the correct usage",
+    "Incorrect input.",
+    "Incorrect port number.",
+    "Number must be in range 0-63335.",
+    "Connect close.",
+    "Unable to create a server.", 
+    "Couldn't connect to the server.",
+    "Invalid IP address."
+  };
+
+  printf(ANSI_COLOR_RED "%s\n", errors[error_code], ANSI_COLOR_RESET "\n");
+
 }
